@@ -19,9 +19,9 @@ local function get_project_name()
     return project_name
 end
 
-local base_data_path = string.format("%s/charta/chartas", vim.fn.stdpath("data"))
+local base_data_path = Path:new(string.format("%s/charta/chartas", vim.fn.stdpath("data")))
 local project_name = get_project_name()
-local data_path = string.format("%s/%s", base_data_path, project_name)
+local data_path = base_data_path:joinpath(project_name)
 
 local ensured_data_path = false
 local function ensure_data_path()
@@ -37,8 +37,8 @@ local function ensure_data_path()
 end
 
 ensure_data_path()
-local charta_name = "/charta"
-local file_path = data_path .. charta_name
+local charta_name = "default"
+local file_path = data_path:joinpath(charta_name)
 
 function ChartaUI:open_window()
   -- If window already exists and is valid, focus it
@@ -59,12 +59,12 @@ function ChartaUI:open_window()
     error("Could not set relative width & height, falling back to static size.")
   end
 
-  local buffer = vim.fn.bufadd(file_path)
+  local buffer = vim.fn.bufadd(file_path:absolute())
   vim.fn.bufload(buffer)
 
   local win_id = vim.api.nvim_open_win(buffer, true, {
     relative = "editor",
-    title = "Charta - Main file",
+    title = "Charta",
     title_pos = "left",
     row = math.floor(((vim.o.lines - height) / 2) - 1),
     col = math.floor((vim.o.columns - width) / 2),
@@ -129,7 +129,7 @@ function ChartaUI:add_bookmark()
     bookmark = string.format("%s:%d", relative_file, line_number)
   end
 
-  local path = Path:new(file_path)
+  local path = file_path
   local contents = path:exists() and path:read() or ""
 
   if contents ~= "" and not contents:match("\n$") then
@@ -137,15 +137,6 @@ function ChartaUI:add_bookmark()
   end
 
   path:write(contents .. bookmark .. "\n", "w")
-
-  -- Reload any open buffers with this file
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(buf) and vim.api.nvim_buf_get_name(buf) == file_path then
-      vim.api.nvim_buf_call(buf, function()
-        vim.cmd("edit!")
-      end)
-    end
-  end
 
   -- Exit visual mode if we were in visual mode
   if mode == "v" or mode == "V" or mode == "\22" then
