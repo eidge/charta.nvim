@@ -1,15 +1,16 @@
 # charta.nvim
 
-A Neovim plugin for managing project-specific bookmark collections. Quickly capture and organize code locations across your project with visual chartas.
+A Neovim plugin for managing project-specific code pointers. Quickly capture, organize and navigate to code locations across your project.
+
+<img width="864" height="489" alt="image" src="https://github.com/user-attachments/assets/544cf7b2-9839-4e43-b022-bd72a0cc8bc9" />
 
 ## Features
 
-- Create multiple bookmark collections (chartas) per project
+- Create multiple code pointer collections (chartas) per project
 - Add bookmarks from any file location with a single keypress
 - Support for both single-line and range bookmarks
 - Jump back to bookmarked locations instantly
 - Per-project storage keeps bookmarks organized
-- Intuitive floating window interface
 
 ## Requirements
 
@@ -60,31 +61,21 @@ When viewing the charta list:
 
 ### Workflow
 
-1. **Add bookmarks**: Navigate to any location in your code and press `<leader>a` to add it to your current charta
-   - In visual mode, it will bookmark the entire selected range
+1. **Create collections**: When adding your first bookmark, you'll be prompted to create or select a charta
 
-2. **Create collections**: When adding your first bookmark, you'll be prompted to create or select a charta
+2. **Add bookmarks**: Navigate to any location in your code and press `<leader>a` to add it to your current charta
+   - In visual mode, it will bookmark the entire selected range
 
 3. **Jump back**: Press `<leader>h` to open your charta, then `<CR>` on any bookmark to jump to that location
 
-4. **Organize**: Create multiple chartas for different tasks (e.g., "bug-123", "feature-auth", "refactor-api")
-
-### Bookmark Format
-
-Bookmarks are stored in a simple text format:
-```
-path/to/file.lua:42
-path/to/other.lua:10-15
-```
-
-You can manually edit charta files if needed. They're stored in your Neovim data directory under `charta/chartas/<project-name>/`.
+4. **Organize**: Create multiple chartas for different tasks or features (e.g., "bug-123", "feature-auth", "refactor-api")
 
 ## How It Works
 
 - Chartas are stored per-project based on your current working directory
 - Storage location: `~/.local/share/nvim/charta/chartas/<project-name>/`
 - Each charta is a plain text file containing bookmarks
-- Bookmarks use relative paths from your project root
+- Bookmarks use relative paths from your project root so they're easily shareable
 
 ## License
 
