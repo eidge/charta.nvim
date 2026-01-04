@@ -212,6 +212,36 @@ function ChartaUI:open_bookmark()
   error("No file to open")
 end
 
+function ChartaUI:open_list()
+  -- Get list of charta files in the current project's directory
+  local chartas = {}
+
+  if data_path:exists() then
+    for entry_name, entry_type in vim.fs.dir(data_path:absolute()) do
+      if entry_type == "file" then
+        table.insert(chartas, entry_name)
+      end
+    end
+  end
+
+  if #chartas == 0 then
+    print("No chartas found for this project")
+    return
+  end
+
+  -- Sort alphabetically
+  table.sort(chartas)
+
+  -- Use vim.ui.select to show the list
+  vim.ui.select(chartas, {
+    prompt = "Select a charta:",
+  }, function(choice)
+    if choice then
+      self:open_charta(choice)
+    end
+  end)
+end
+
 -- Move this to key configuration that gets called in setup
 vim.keymap.set({"n", "v"}, "<leader>a", function()
   print("Adding bookmark")
@@ -222,11 +252,15 @@ vim.keymap.set({"n", "v"}, "<leader>h", function()
   ChartaUI:open_charta()
 end, { desc = "Open charta" })
 
--- Create user command
+-- Create user commands
 vim.api.nvim_create_user_command("ChartaOpen", function(opts)
   local charta_name = opts.args ~= "" and opts.args or nil
   ChartaUI:open_charta(charta_name)
 end, { nargs = "?", desc = "Open charta window" })
+
+vim.api.nvim_create_user_command("ChartaList", function()
+  ChartaUI:open_list()
+end, { desc = "List and select a charta to open" })
 
 local M = {}
 
