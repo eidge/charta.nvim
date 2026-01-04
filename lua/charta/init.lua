@@ -1,51 +1,20 @@
 local Path = require('plenary.path')
-
-function make_opts()
-  return {
-    ui_width_ratio = 0.667,
-    ui_height_ratio = 0.667,
-  }
-end
-
-local opts = make_opts()
+local config = require('charta.config')
 
 local ChartaUI = {}
 local augroup = vim.api.nvim_create_augroup("Charta", {})
 
-local function get_project_name()
-    local cwd = vim.fn.getcwd()
-    -- Get the last component of the path as project name
-    local project_name = vim.fn.fnamemodify(cwd, ":t")
-    return project_name
-end
-
-local base_data_path = Path:new(string.format("%s/charta/chartas", vim.fn.stdpath("data")))
-local project_name = get_project_name()
-local data_path = base_data_path:joinpath(project_name)
-
-local ensured_data_path = false
-local function ensure_data_path()
-    if ensured_data_path then
-        return
-    end
-
-    local path = Path:new(data_path)
-    if not path:exists() then
-        path:mkdir({ parents = true })
-    end
-    ensured_data_path = true
-end
-
-ensure_data_path()
 
 local function get_file_path(charta_name)
   if not charta_name then
     error("No charta name provided")
   end
-  return data_path:joinpath(charta_name)
+  return config.data_path():joinpath(charta_name)
 end
 
 function ChartaUI:open_charta(charta_name)
+  config.ensure_data_path()
+
   -- If no charta name provided and no current charta, open the list
   if not charta_name and not self.current_charta then
     self:open_list()
@@ -62,17 +31,8 @@ function ChartaUI:open_charta(charta_name)
     return
   end
 
-  local wins = vim.api.nvim_list_uis()
-
-  local width = 200
-  local height = 10
-
-  if #wins > 0 then
-    width = math.floor(wins[1].width * opts.ui_width_ratio)
-    height = math.floor(wins[1].height * opts.ui_height_ratio)
-  else
-    error("Could not set relative width & height, falling back to static size.")
-  end
+  local width = config.window_width()
+  local height = config.window_height()
 
   local buffer = vim.fn.bufadd(file_path:absolute())
   vim.fn.bufload(buffer)
@@ -246,9 +206,12 @@ function ChartaUI:open_bookmark()
 end
 
 function ChartaUI:open_list()
+  config.ensure_data_path()
+
   -- Get list of charta files in the current project's directory
   local chartas = {}
 
+  local data_path = config.data_path()
   if data_path:exists() then
     for entry_name, entry_type in vim.fs.dir(data_path:absolute()) do
       if entry_type == "file" then
@@ -266,15 +229,8 @@ function ChartaUI:open_list()
     table.insert(display_items, charta)
   end
 
-  local wins = vim.api.nvim_list_uis()
-
-  local width = 60
-  local height = math.min(#display_items, 20)
-
-  if #wins > 0 then
-    width = math.min(60, math.floor(wins[1].width * 0.5))
-    height = math.min(#display_items, math.floor(wins[1].height * opts.ui_height_ratio))
-  end
+  local width = math.min(60, config.window_width())
+  local height = math.min(#display_items, config.window_height())
 
   -- Create a scratch buffer
   local buffer = vim.api.nvim_create_buf(false, true)
@@ -390,32 +346,30 @@ function ChartaUI:open_list()
   end, { buffer = buffer, desc = "Delete charta" })
 end
 
--- Move this to key configuration that gets called in setup
-vim.keymap.set({"n", "v"}, "<leader>a", function()
-  print("Adding bookmark")
-  ChartaUI:add_bookmark()
-end, { desc = "Add bookmark to Charta" })
-
-vim.keymap.set({"n", "v"}, "<leader>h", function()
-  ChartaUI:open_charta()
-end, { desc = "Open charta" })
-
--- Create user commands
-vim.api.nvim_create_user_command("ChartaOpen", function(opts)
-  local charta_name = opts.args ~= "" and opts.args or nil
-  ChartaUI:open_charta(charta_name)
-end, { nargs = "?", desc = "Open charta window" })
-
-vim.api.nvim_create_user_command("ChartaList", function()
-  ChartaUI:open_list()
-end, { desc = "List and select a charta to open" })
-
 local M = {}
 
-function M:setup(opts)
+function M.setup(opts)
   opts = opts or {}
 
-  print("Setup function ran")
+  -- Set up keymaps
+  vim.keymap.set({"n", "v"}, "<leader>a", function()
+    print("Adding bookmark")
+    ChartaUI:add_bookmark()
+  end, { desc = "Add bookmark to Charta" })
+
+  vim.keymap.set({"n", "v"}, "<leader>h", function()
+    ChartaUI:open_charta()
+  end, { desc = "Open charta" })
+
+  -- Create user commands
+  vim.api.nvim_create_user_command("ChartaOpen", function(cmd_opts)
+    local charta_name = cmd_opts.args ~= "" and cmd_opts.args or nil
+    ChartaUI:open_charta(charta_name)
+  end, { nargs = "?", desc = "Open charta window" })
+
+  vim.api.nvim_create_user_command("ChartaList", function()
+    ChartaUI:open_list()
+  end, { desc = "List and select a charta to open" })
 end
 
 return M
