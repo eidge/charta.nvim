@@ -39,12 +39,21 @@ end
 ensure_data_path()
 
 local function get_file_path(charta_name)
-  return data_path:joinpath(charta_name or "default")
+  if not charta_name then
+    error("No charta name provided")
+  end
+  return data_path:joinpath(charta_name)
 end
 
 function ChartaUI:open_charta(charta_name)
+  -- If no charta name provided and no current charta, open the list
+  if not charta_name and not self.current_charta then
+    self:open_list()
+    return
+  end
+
   -- Store the current charta name (remember previous if not specified)
-  self.current_charta = charta_name or self.current_charta or "default"
+  self.current_charta = charta_name or self.current_charta
   local file_path = get_file_path(self.current_charta)
 
   -- If window already exists and is valid, focus it
@@ -107,6 +116,23 @@ function ChartaUI:open_charta(charta_name)
       self.win_id = nil
     end
   end, { buffer = buffer, desc = "Save and close charta window" })
+
+  -- Set up keymap for going to the list view
+  vim.keymap.set("n", "-", function()
+    -- Save the buffer
+    vim.api.nvim_buf_call(buffer, function()
+      vim.cmd("write")
+    end)
+
+    -- Close the window
+    if self.win_id and vim.api.nvim_win_is_valid(self.win_id) then
+      vim.api.nvim_win_close(self.win_id, true)
+      self.win_id = nil
+    end
+
+    -- Open the list
+    self:open_list()
+  end, { buffer = buffer, desc = "Go to charta list" })
 end
 
 function ChartaUI:add_bookmark()
@@ -135,7 +161,19 @@ function ChartaUI:add_bookmark()
     bookmark = string.format("%s:%d", relative_file, line_number)
   end
 
-  local path = get_file_path(self.current_charta or "default")
+  -- Exit visual mode if we were in visual mode
+  if mode == "v" or mode == "V" or mode == "\22" then
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
+  end
+
+  -- If no current charta, store bookmark and open list
+  if not self.current_charta then
+    self.pending_bookmark = bookmark
+    self:open_list()
+    return
+  end
+
+  local path = get_file_path(self.current_charta)
   local contents = path:exists() and path:read() or ""
 
   if contents ~= "" and not contents:match("\n$") then
@@ -143,11 +181,6 @@ function ChartaUI:add_bookmark()
   end
 
   path:write(contents .. bookmark .. "\n", "w")
-
-  -- Exit visual mode if we were in visual mode
-  if mode == "v" or mode == "V" or mode == "\22" then
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
-  end
 end
 
 function ChartaUI:open_bookmark()
@@ -224,22 +257,137 @@ function ChartaUI:open_list()
     end
   end
 
-  if #chartas == 0 then
-    print("No chartas found for this project")
-    return
-  end
-
   -- Sort alphabetically
   table.sort(chartas)
 
-  -- Use vim.ui.select to show the list
-  vim.ui.select(chartas, {
-    prompt = "Select a charta:",
-  }, function(choice)
-    if choice then
-      self:open_charta(choice)
+  -- Add "Create new charta" option at the top
+  local display_items = { "Create new charta", "" }
+  for _, charta in ipairs(chartas) do
+    table.insert(display_items, charta)
+  end
+
+  local wins = vim.api.nvim_list_uis()
+
+  local width = 60
+  local height = math.min(#display_items, 20)
+
+  if #wins > 0 then
+    width = math.min(60, math.floor(wins[1].width * 0.5))
+    height = math.min(#display_items, math.floor(wins[1].height * opts.ui_height_ratio))
+  end
+
+  -- Create a scratch buffer
+  local buffer = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buffer, 0, -1, false, display_items)
+
+  local win_id = vim.api.nvim_open_win(buffer, true, {
+    relative = "editor",
+    title = "Select Charta",
+    title_pos = "center",
+    row = math.floor(((vim.o.lines - height) / 2) - 1),
+    col = math.floor((vim.o.columns - width) / 2),
+    width = width,
+    height = height,
+    style = "minimal",
+    border = "single",
+  })
+
+  if win_id == 0 then
+    error("failed to open window")
+  end
+
+  vim.api.nvim_set_option_value("number", false, { win = win_id })
+  vim.api.nvim_set_option_value("cursorline", true, { win = win_id })
+  vim.api.nvim_set_option_value("modifiable", false, { buf = buffer })
+
+  -- Set up keymap for selecting a charta
+  vim.keymap.set("n", "<CR>", function()
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local line_num = cursor[1]
+    local selected = display_items[line_num]
+
+    if line_num == 1 then
+      -- Create new charta
+      vim.api.nvim_win_close(win_id, true)
+      vim.ui.input({ prompt = "Enter charta name: " }, function(input)
+        if input and input ~= "" then
+          self.current_charta = input
+
+          -- If there's a pending bookmark, add it
+          if self.pending_bookmark then
+            local path = get_file_path(input)
+            local contents = path:exists() and path:read() or ""
+            if contents ~= "" and not contents:match("\n$") then
+              contents = contents .. "\n"
+            end
+            path:write(contents .. self.pending_bookmark .. "\n", "w")
+            print("Bookmark added to: " .. input)
+            self.pending_bookmark = nil
+          else
+            self:open_charta(input)
+          end
+        else
+          -- Clear pending bookmark if cancelled
+          self.pending_bookmark = nil
+        end
+      end)
+    elseif selected and selected ~= "" then
+      vim.api.nvim_win_close(win_id, true)
+
+      -- If there's a pending bookmark, add it
+      if self.pending_bookmark then
+        self.current_charta = selected
+        local path = get_file_path(selected)
+        local contents = path:exists() and path:read() or ""
+        if contents ~= "" and not contents:match("\n$") then
+          contents = contents .. "\n"
+        end
+        path:write(contents .. self.pending_bookmark .. "\n", "w")
+        print("Bookmark added to: " .. selected)
+        self.pending_bookmark = nil
+      else
+        self:open_charta(selected)
+      end
     end
-  end)
+  end, { buffer = buffer, desc = "Open selected charta" })
+
+  -- Set up keymap for closing the window
+  vim.keymap.set("n", "<Esc>", function()
+    if vim.api.nvim_win_is_valid(win_id) then
+      vim.api.nvim_win_close(win_id, true)
+    end
+    -- Clear pending bookmark if cancelled
+    self.pending_bookmark = nil
+  end, { buffer = buffer, desc = "Close charta list" })
+
+  -- Set up keymap for deleting a charta
+  vim.keymap.set("n", "dd", function()
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local line_num = cursor[1]
+    local selected = display_items[line_num]
+
+    -- Don't allow deleting the "Create new charta" option or empty lines
+    if line_num <= 2 or not selected or selected == "" then
+      return
+    end
+
+    -- Ask for confirmation
+    vim.ui.input({ prompt = "Delete '" .. selected .. "'? (y/n): " }, function(input)
+      if input and (input:lower() == "y" or input:lower() == "yes") then
+        local file_path = get_file_path(selected)
+        if file_path:exists() then
+          file_path:rm()
+          print("Deleted charta: " .. selected)
+
+          -- Close and reopen the list to refresh
+          if vim.api.nvim_win_is_valid(win_id) then
+            vim.api.nvim_win_close(win_id, true)
+          end
+          self:open_list()
+        end
+      end
+    end)
+  end, { buffer = buffer, desc = "Delete charta" })
 end
 
 -- Move this to key configuration that gets called in setup
