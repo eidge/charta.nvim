@@ -37,10 +37,16 @@ local function ensure_data_path()
 end
 
 ensure_data_path()
-local charta_name = "default"
-local file_path = data_path:joinpath(charta_name)
 
-function ChartaUI:open_window()
+local function get_file_path(charta_name)
+  return data_path:joinpath(charta_name or "default")
+end
+
+function ChartaUI:open_charta(charta_name)
+  -- Store the current charta name (remember previous if not specified)
+  self.current_charta = charta_name or self.current_charta or "default"
+  local file_path = get_file_path(self.current_charta)
+
   -- If window already exists and is valid, focus it
   if self.win_id and vim.api.nvim_win_is_valid(self.win_id) then
     vim.api.nvim_set_current_win(self.win_id)
@@ -64,7 +70,7 @@ function ChartaUI:open_window()
 
   local win_id = vim.api.nvim_open_win(buffer, true, {
     relative = "editor",
-    title = "Charta",
+    title = "Charta: " .. self.current_charta,
     title_pos = "left",
     row = math.floor(((vim.o.lines - height) / 2) - 1),
     col = math.floor((vim.o.columns - width) / 2),
@@ -129,7 +135,7 @@ function ChartaUI:add_bookmark()
     bookmark = string.format("%s:%d", relative_file, line_number)
   end
 
-  local path = file_path
+  local path = get_file_path(self.current_charta or "default")
   local contents = path:exists() and path:read() or ""
 
   if contents ~= "" and not contents:match("\n$") then
@@ -213,8 +219,14 @@ vim.keymap.set({"n", "v"}, "<leader>a", function()
 end, { desc = "Add bookmark to Charta" })
 
 vim.keymap.set({"n", "v"}, "<leader>h", function()
-  ChartaUI:open_window()
+  ChartaUI:open_charta()
 end, { desc = "Open charta" })
+
+-- Create user command
+vim.api.nvim_create_user_command("ChartaOpen", function(opts)
+  local charta_name = opts.args ~= "" and opts.args or nil
+  ChartaUI:open_charta(charta_name)
+end, { nargs = "?", desc = "Open charta window" })
 
 local M = {}
 
