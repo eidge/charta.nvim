@@ -2,11 +2,13 @@ local Path = require('plenary.path')
 
 local M = {}
 
--- Hardcoded configuration options
-local UI_WIDTH_RATIO = 0.667
-local UI_HEIGHT_RATIO = 0.667
-local DEFAULT_WIDTH = 200
-local DEFAULT_HEIGHT = 10
+-- Configuration state with default values
+local config_state = {
+  ui_width_ratio = 0.667,
+  ui_height_ratio = 0.667,
+  default_width = 200,
+  default_height = 10,
+}
 
 -- Get project name from current working directory
 local function get_project_name()
@@ -15,22 +17,66 @@ local function get_project_name()
   return project_name
 end
 
+-- Validate user configuration options
+local function validate_opts(opts)
+  local valid = true
+
+  if opts.ui_width_ratio then
+    if type(opts.ui_width_ratio) ~= "number" or opts.ui_width_ratio <= 0 or opts.ui_width_ratio >= 1 then
+      vim.notify("charta.nvim: ui_width_ratio must be a number between 0 and 1", vim.log.levels.WARN)
+      valid = false
+    end
+  end
+
+  if opts.ui_height_ratio then
+    if type(opts.ui_height_ratio) ~= "number" or opts.ui_height_ratio <= 0 or opts.ui_height_ratio >= 1 then
+      vim.notify("charta.nvim: ui_height_ratio must be a number between 0 and 1", vim.log.levels.WARN)
+      valid = false
+    end
+  end
+
+  if opts.default_width then
+    if type(opts.default_width) ~= "number" or opts.default_width <= 0 then
+      vim.notify("charta.nvim: default_width must be a positive number", vim.log.levels.WARN)
+      valid = false
+    end
+  end
+
+  if opts.default_height then
+    if type(opts.default_height) ~= "number" or opts.default_height <= 0 then
+      vim.notify("charta.nvim: default_height must be a positive number", vim.log.levels.WARN)
+      valid = false
+    end
+  end
+
+  return valid
+end
+
+-- Setup function to merge user options with defaults
+function M.setup(opts)
+  opts = opts or {}
+
+  if validate_opts(opts) then
+    config_state = vim.tbl_deep_extend("force", config_state, opts)
+  end
+end
+
 -- Get window width based on UI ratio
 function M.window_width()
   local wins = vim.api.nvim_list_uis()
   if #wins > 0 then
-    return math.floor(wins[1].width * UI_WIDTH_RATIO)
+    return math.floor(wins[1].width * config_state.ui_width_ratio)
   end
-  return DEFAULT_WIDTH
+  return config_state.default_width
 end
 
 -- Get window height based on UI ratio
 function M.window_height()
   local wins = vim.api.nvim_list_uis()
   if #wins > 0 then
-    return math.floor(wins[1].height * UI_HEIGHT_RATIO)
+    return math.floor(wins[1].height * config_state.ui_height_ratio)
   end
-  return DEFAULT_HEIGHT
+  return config_state.default_height
 end
 
 -- Get data path for the current project

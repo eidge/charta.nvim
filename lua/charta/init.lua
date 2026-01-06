@@ -5,15 +5,9 @@ local M = {}
 function M.setup(opts)
   opts = opts or {}
 
-  -- Set up keymaps
-  vim.keymap.set({"n", "v"}, "<leader>a", function()
-    print("Adding bookmark")
-    ChartaUI:add_bookmark()
-  end, { desc = "Add bookmark to Charta" })
-
-  vim.keymap.set({"n", "v"}, "<leader>h", function()
-    ChartaUI:open_charta()
-  end, { desc = "Open charta" })
+  -- Initialize config with user options
+  local config = require('charta.config')
+  config.setup(opts)
 
   -- Create user commands
   vim.api.nvim_create_user_command("ChartaOpen", function(cmd_opts)
@@ -24,6 +18,15 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("ChartaList", function()
     ChartaUI:open_list()
   end, { desc = "List and select a charta to open" })
+end
+
+-- Public API functions for keybindings
+function M.add_bookmark()
+  ChartaUI:add_bookmark()
+end
+
+function M.open_charta(charta_name)
+  ChartaUI:open_charta(charta_name)
 end
 
 return M

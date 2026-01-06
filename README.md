@@ -27,16 +27,47 @@ Add to your plugins directory (e.g., `~/.config/nvim/lua/plugins/charta-nvim.lua
 return {
   "eidge/charta.nvim",
   opts = {},
-  dependencies = { "nvim-lua/plenary.nvim" }
+  dependencies = { "nvim-lua/plenary.nvim" },
+  keys = {
+    { "<leader>a", function() require("charta").add_bookmark() end, mode = {"n", "v"}, desc = "Add bookmark to Charta" },
+    { "<leader>h", function() require("charta").open_charta() end, mode = {"n", "v"}, desc = "Open charta" },
+  }
 }
 ```
 
+## Configuration
+
+You can customize the plugin by passing options to the `opts` table:
+
+```lua
+return {
+  "eidge/charta.nvim",
+  opts = {
+    ui_width_ratio = 0.8,     -- Width of charta window as ratio of screen (default: 0.667)
+    ui_height_ratio = 0.8,    -- Height of charta window as ratio of screen (default: 0.667)
+    default_width = 300,      -- Fallback width when screen size unavailable (default: 200)
+    default_height = 20       -- Fallback height when screen size unavailable (default: 10)
+  },
+  dependencies = { "nvim-lua/plenary.nvim" },
+  keys = {
+    { "<leader>a", function() require("charta").add_bookmark() end, mode = {"n", "v"}, desc = "Add bookmark to Charta" },
+    { "<leader>h", function() require("charta").open_charta() end, mode = {"n", "v"}, desc = "Open charta" },
+  }
+}
+```
+
+**Note**: Ratios must be between 0 and 1. Invalid values will show a warning and use defaults.
+
 ## Usage
 
-### Default Keymaps
+### Keymaps
+
+Keymaps are configured via lazy.nvim's `keys` field (see Installation section above). The suggested keymaps are:
 
 - `<leader>a` - Add current line/selection as bookmark
 - `<leader>h` - Open charta window
+
+You can customize these to any keybindings you prefer.
 
 ### Commands
 
